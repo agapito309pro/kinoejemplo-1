@@ -1,7 +1,7 @@
 {
   "id": "hentaird",
   "name": "HentaiRD",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "apiVersion": 9,
   "entry": "plugin.js",
   "description": "Hentai subtitulado al español desde hentaird.tv: nuevos capítulos, destacados, géneros, búsqueda y varios servidores con selector. Contenido +18.",
@@ -32,12 +32,26 @@
     "gupload.site",
     "*.gupload.site",
     "firestream.to",
-    "*.firestream.to"
+    "*.firestream.to",
+    "frstream.life",
+    "*.frstream.life",
+    "tnmr.org",
+    "*.tnmr.org"
   ],
   "streamHosts": "any",
   "fetchHosts": "any",
-  "capabilities": ["search", "home", "browse", "episodes", "resolve", "download"],
-  "categories": ["anime", "adult"],
+  "capabilities": [
+    "search",
+    "home",
+    "browse",
+    "episodes",
+    "resolve",
+    "download"
+  ],
+  "categories": [
+    "anime",
+    "adult"
+  ],
   "color": "#007575",
   "icon": "icon.png",
   "settings": [
@@ -46,18 +60,48 @@
       "label": "Servidor preferido",
       "type": "select",
       "default": "auto",
-      "hint": "Automático prueba los mejores primero",
+      "hint": "Automático prueba primero StreamHLS y Lulu (los más rápidos).",
       "options": [
-        { "value": "auto", "label": "Automático (mejor servidor)" },
-        { "value": "lulu", "label": "Lulu" },
-        { "value": "sendvid", "label": "Sendvid" },
-        { "value": "streamhls", "label": "StreamHLS" },
-        { "value": "byse", "label": "Byse" },
-        { "value": "streamwish", "label": "StreamWish" },
-        { "value": "voe", "label": "VOE" },
-        { "value": "vidhide", "label": "VidHide" },
-        { "value": "gupload", "label": "Gupload (lento)" },
-        { "value": "firestream", "label": "Firestream (lento)" }
+        {
+          "value": "auto",
+          "label": "Automático (más rápidos primero)"
+        },
+        {
+          "value": "streamhls",
+          "label": "StreamHLS (más rápido)"
+        },
+        {
+          "value": "lulu",
+          "label": "Lulu (rápido)"
+        },
+        {
+          "value": "byse",
+          "label": "Byse"
+        },
+        {
+          "value": "sendvid",
+          "label": "Sendvid"
+        },
+        {
+          "value": "streamwish",
+          "label": "StreamWish"
+        },
+        {
+          "value": "voe",
+          "label": "VOE"
+        },
+        {
+          "value": "vidhide",
+          "label": "VidHide"
+        },
+        {
+          "value": "gupload",
+          "label": "Gupload (lento)"
+        },
+        {
+          "value": "firestream",
+          "label": "Firestream (lento)"
+        }
       ]
     }
   ]

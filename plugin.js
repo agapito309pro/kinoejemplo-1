@@ -3,8 +3,10 @@
 
 var BASE = 'https://hentaird.tv';
 
-// Orden de prioridad de servidores (los lentos al final, a pedido del autor).
-var PRIO = ['lulu', 'sendvid', 'streamhls', 'byse', 'streamwish', 'voe', 'vidhide'];
+// Orden de prioridad por velocidad real (medido 2026-11-13):
+// StreamHLS ~0.1s, Lulu ~0.5s, resto más lento o SPA/403.
+// Gupload/Firestream al final (lentos / pesados).
+var PRIO = ['streamhls', 'lulu', 'byse', 'sendvid', 'streamwish', 'voe', 'vidhide'];
 var SERVERS = [
   { id: 'lulu', name: 'Lulu', re: /lulu/i },
   { id: 'sendvid', name: 'Sendvid', re: /sendvid/i },
@@ -382,6 +384,7 @@ function orderServers(servers) {
 }
 
 // Desempaquetador de Dean Edwards (sin eval).
+// Soporta el estilo clásico y el de while(c--)if(k[c])… (Lulu/Luluvid y derivados).
 function decodeWord(w, radix) {
   var n = 0;
   for (var i = 0; i < w.length; i++) {
@@ -395,29 +398,28 @@ function decodeWord(w, radix) {
   return n;
 }
 
-function parsePacked(seg) {
-  var argIdx = seg.indexOf('}(');
-  if (argIdx < 0) return null;
-  var q = seg.charAt(argIdx + 2);
-  if (q !== "'" && q !== '"') return null;
-  var splitIdx = seg.indexOf('.split', argIdx);
-  if (splitIdx < 0) return null;
-  var wordsEnd = seg.lastIndexOf(q, splitIdx);
-  if (wordsEnd < argIdx + 3) return null;
-  var wordsStr = seg.slice(argIdx + 3, wordsEnd);
-  var pre = seg.slice(argIdx, wordsEnd);
-  var pm = pre.match(new RegExp('\\(([' + q + '])([\\s\\S]*)\\1,(\\d+),(\\d+),$'));
-  if (!pm) return null;
-  var radix = parseInt(pm[3], 10);
-  if (!(radix > 1 && radix <= 62)) return null;
-  return { payload: pm[2], radix: radix, words: wordsStr.split('|') };
-}
-
 function unpackPacked(pk) {
   return pk.payload.replace(/[0-9a-zA-Z]+/g, function (w) {
     var n = decodeWord(w, pk.radix);
     return (n >= 0 && n < pk.words.length && pk.words[n]) ? pk.words[n] : w;
   });
+}
+
+function parsePacked(seg) {
+  // Formato: }('payload', radix, count, 'w0|w1|…'.split('|')
+  var m = seg.match(/\}\(((?:'(?:\\'|[^'])*'|"(?:\\"|[^"])*")),(\d+),(\d+),((?:'(?:\\'|[^'])*'|"(?:\\"|[^"])*"))\.split/);
+  if (!m) return null;
+  var radix = parseInt(m[2], 10);
+  if (!(radix > 1 && radix <= 62)) return null;
+  var pq = m[1].charAt(0);
+  var payload = m[1].slice(1, -1);
+  if (pq === "'") payload = payload.replace(/\\'/g, "'");
+  else payload = payload.replace(/\\"/g, '"');
+  var wq = m[4].charAt(0);
+  var wordsStr = m[4].slice(1, -1);
+  if (wq === "'") wordsStr = wordsStr.replace(/\\'/g, "'");
+  else wordsStr = wordsStr.replace(/\\"/g, '"');
+  return { payload: payload, radix: radix, words: wordsStr.split('|') };
 }
 
 // Desempaqueta todos los scripts empaquetados de la página y devuelve el texto juntos.
