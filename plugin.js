@@ -19,6 +19,8 @@ var SERVERS = [
 
 // ---------- utilidades ----------
 
+var BROWSER_UA = 'Mozilla/5.0 (Linux; Android 13; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+
 function abs(u) {
   if (!u) return u;
   u = String(u).trim();
@@ -59,6 +61,9 @@ function safeId(s) {
 async function fetchText(url, opts) {
   var o = opts || {};
   o.timeoutMs = o.timeoutMs || 12000;
+  var h = { 'User-Agent': BROWSER_UA };
+  for (var k in (o.headers || {})) h[k] = o.headers[k];
+  o.headers = h;
   var r = await kino.fetch(url, o);
   if (!r.ok) throw kino.error('unavailable', 'HTTP ' + r.status);
   return await r.text();
@@ -430,16 +435,21 @@ function unpackAll(html) {
 }
 
 function findStreamUrl(text) {
-  var m = text.match(/(jwplayer|setup|sources)[\s\S]{0,400}?file\s*:\s*["'](https?:\/\/[^"']+)["']/i);
-  if (m) return m[2];
-  m = text.match(/file\s*:\s*["'](https?:\/\/[^"']+)["']/i);
-  if (m) return m[1];
-  var m2 = text.match(/["'](https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)["']/i);
-  if (m2) return m2[1];
-  var m3 = text.match(/["'](https?:\/\/[^"'\s]+\.mp4[^"'\s]*)["']/i);
-  if (m3) return m3[1];
-  var m4 = text.match(/(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/i);
-  if (m4) return m4[1];
+  // Busca también en una copia sin escapes (JSON con \/ y \" dentro del HTML).
+  var pool = [String(text), String(text).replace(/\\\//g, '/')];
+  for (var p = 0; p < pool.length; p++) {
+    var t = pool[p];
+    var m = t.match(/(jwplayer|setup|sources)[\s\S]{0,400}?file\s*:\s*["'](https?:\/\/[^"']+)["']/i);
+    if (m) return m[2];
+    m = t.match(/file\s*:\s*["'](https?:\/\/[^"']+)["']/i);
+    if (m) return m[1];
+    m = t.match(/["'](https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)["']/i);
+    if (m) return m[1];
+    m = t.match(/["'](https?:\/\/[^"'\s]+\.mp4[^"'\s]*)["']/i);
+    if (m) return m[1];
+    m = t.match(/(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/i);
+    if (m) return m[1];
+  }
   return null;
 }
 
@@ -450,7 +460,7 @@ function wrapStream(url, label) {
 }
 
 async function extractPackedPage(url, label) {
-  var html = await fetchText(url, { timeoutMs: 8000 });
+  var html = await fetchText(url, { timeoutMs: 8000, headers: { Referer: BASE + '/' } });
   var text = html;
   try {
     var unpacked = unpackAll(html);
@@ -461,7 +471,7 @@ async function extractPackedPage(url, label) {
 }
 
 async function extractSendvid(url, label) {
-  var html = await fetchText(url, { timeoutMs: 8000 });
+  var html = await fetchText(url, { timeoutMs: 8000, headers: { Referer: BASE + '/' } });
   var m = html.match(/<meta[^>]+property=["']og:video["'][^>]+content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:video["']/i);
   if (m && m[1].indexOf('http') === 0) {
@@ -473,6 +483,7 @@ async function extractSendvid(url, label) {
 }
 
 function resolveUrl(base, u) {
+  if (!u) return null;
   if (u.indexOf('http') === 0) return u;
   if (u.indexOf('//') === 0) return 'https:' + u;
   if (u.charAt(0) === '/') {
@@ -482,28 +493,50 @@ function resolveUrl(base, u) {
   return null;
 }
 
-async function tryFormPost(pageUrl, html) {
-  var fm = html.match(/<form([^>]*)>([\s\S]*?)<\/form>/i);
-  if (!fm) return null;
-  var attrs = fm[1];
-  if (!/method=["']post["']/i.test(attrs)) return null;
-  var am = attrs.match(/action=["']([^"']+)["']/i);
-  var action = am ? resolveUrl(pageUrl, am[1]) : pageUrl;
-  if (!action) return null;
-  var inputs = {}, ire = /<input[^>]*>/gi, im;
-  while ((im = ire.exec(fm[2]))) {
-    var tag = im[0];
-    var nm = tag.match(/name=["']([^"']+)["']/i);
-    var vm = tag.match(/value=["']([^"']*)["']/i);
-    if (nm) inputs[nm[1]] = vm ? vm[1] : '';
-  }
-  var r = await kino.fetch(action, { method: 'POST', body: { form: inputs }, timeoutMs: 8000 });
-  if (!r.ok) return null;
-  return await r.text();
+// Sigue redirecciones hechas por JavaScript (VOE y similares rotan de dominio así).
+function jsRedirect(html) {
+  var m = String(html).match(/window\.location\.href\s*=\s*['"](https?:\/\/[^'"]+)['"]/);
+  return m ? m[1] : null;
 }
 
-async function extractGeneric(url, label) {
-  var html = await fetchText(url, { timeoutMs: 8000 });
+async function tryFormPost(pageUrl, html) {
+  var forms = [], fre = /<form([^>]*)>([\s\S]*?)<\/form>/gi, fm;
+  while ((fm = fre.exec(html)) && forms.length < 3) {
+    if (/method=["']post["']/i.test(fm[1])) forms.push(fm);
+  }
+  if (!forms.length) return null;
+  var texts = [];
+  for (var f = 0; f < forms.length; f++) {
+    var attrs = forms[f][1];
+    var am = attrs.match(/action=["']([^"']+)["']/i);
+    var action = am ? resolveUrl(pageUrl, am[1]) : pageUrl;
+    if (!action) continue;
+    var inputs = {}, ire = /<input[^>]*>/gi, im;
+    while ((im = ire.exec(forms[f][2]))) {
+      var tag = im[0];
+      var nm = tag.match(/name=["']([^"']+)["']/i);
+      var vm = tag.match(/value=["']([^"']*)["']/i);
+      if (nm) inputs[nm[1]] = vm ? vm[1] : '';
+    }
+    // El JS del navegador rellena estos campos; los inferimos acá.
+    var code = (pageUrl.replace(/\/+$/, '').split('/').pop() || '').split('-').pop();
+    if (inputs.file_code === '' && code) inputs.file_code = code;
+    if (inputs.referer === '') inputs.referer = BASE + '/';
+    try {
+      var r = await kino.fetch(action, {
+        method: 'POST',
+        body: { form: inputs },
+        headers: { Referer: pageUrl },
+        timeoutMs: 8000
+      });
+      if (r.ok) texts.push(await r.text());
+    } catch (e) {}
+  }
+  return texts.join('\n');
+}
+
+async function extractGeneric(url, label, depth) {
+  var html = await fetchText(url, { timeoutMs: 8000, headers: { Referer: BASE + '/' } });
   var u = findStreamUrl(html);
   if (u) return wrapStream(u, label);
   var unpacked = '';
@@ -521,6 +554,11 @@ async function extractGeneric(url, label) {
     }
     if (u) return wrapStream(u, label);
   }
+  // Redirección por JavaScript (p. ej. VOE rota de dominio): seguirla una vez.
+  var redir = jsRedirect(html);
+  if (redir && redir !== url && !(depth > 0)) {
+    try { return await extractGeneric(redir, label, 1); } catch (e) {}
+  }
   return null;
 }
 
@@ -528,8 +566,7 @@ async function extract(server) {
   try {
     if (server.id === 'sendvid') return await extractSendvid(server.url, server.name);
     if (server.id === 'lulu') return await extractPackedPage(server.url, server.name);
-    if (server.id === 'streamhls') return await extractGeneric(server.url, server.name);
-    return await extractGeneric(server.url, server.name);
+    return await extractGeneric(server.url, server.name, 0);
   } catch (e) {
     return null;
   }
@@ -565,15 +602,23 @@ export async function resolve(ref) {
     });
   }
 
-  var primary = null, failed = [], tries = 0;
-  for (var j = 0; j < ordered.length && tries < 4; j++) {
-    tries++;
-    var st = await extract(ordered[j]);
-    if (st) { primary = st; primary.__sid = ordered[j].id; break; }
-    failed.push(ordered[j].id);
+  // Prueba en tandas de 3 en paralelo (orden de prioridad): más cobertura dentro del tiempo.
+  var primary = null, failed = [];
+  for (var b = 0; b < ordered.length && !primary; b += 3) {
+    var batch = ordered.slice(b, b + 3);
+    var results = await Promise.allSettled(batch.map(function (s) { return extract(s); }));
+    for (var i2 = 0; i2 < results.length; i2++) {
+      var res = results[i2];
+      if (res.status === 'fulfilled' && res.value) {
+        primary = res.value;
+        primary.__sid = batch[i2].id;
+        break;
+      }
+      failed.push(batch[i2].id);
+    }
   }
   if (!primary) {
-    throw kino.error('unavailable', 'no stream', { userMessage: 'Ning\u00fan servidor respondi\u00f3. Intenta de nuevo en unos minutos.' });
+    throw kino.error('unavailable', 'no stream: ' + failed.join(','));
   }
 
   var alternatives = [];
