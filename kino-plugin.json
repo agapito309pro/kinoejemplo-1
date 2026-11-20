@@ -1,105 +1,63 @@
 {
-  "id": "hentaird",
-  "name": "HentaiRD",
-  "version": "1.1.1",
-  "apiVersion": 9,
+  "id": "hanime1",
+  "name": "Hanime1.me",
+  "version": "1.0.0",
+  "apiVersion": 6,
   "entry": "plugin.js",
-  "description": "Hentai subtitulado al español desde hentaird.tv: nuevos capítulos, destacados, géneros, búsqueda y varios servidores con selector. Contenido +18.",
+  "description": "Hentai / 裏番 de hanime1.me. MP4 multi-calidad, Uncensored, búsqueda y secciones Home. Solo +18.",
   "author": "Hotaru Yume",
   "creator": "hotaruyume",
-  "homepage": "https://github.com/agapito309pro/kinoejemplo-1",
+  "homepage": "https://hanime1.me",
   "hosts": [
-    "hentaird.tv",
-    "luluvid.com",
-    "*.luluvid.com",
-    "luluvido.com",
-    "*.luluvido.com",
-    "sendvid.com",
-    "*.sendvid.com",
-    "streamhls.to",
-    "*.streamhls.to",
-    "savefiles.com",
-    "upfiles.com",
-    "usersdrive.com",
-    "byseraguci.com",
-    "bysefujedu.com",
-    "streamwish.to",
-    "*.streamwish.to",
-    "voe.sx",
-    "*.voe.sx",
-    "vidhidepro.com",
-    "*.vidhidepro.com",
-    "gupload.site",
-    "*.gupload.site",
-    "firestream.to",
-    "*.firestream.to",
-    "frstream.life",
-    "*.frstream.life",
-    "tnmr.org",
-    "*.tnmr.org"
+    "hanime1.me",
+    "*.hanime1.me",
+    "hanimeone.me",
+    "*.hanimeone.me",
+    "vdownload.hembed.com",
+    "*.hembed.com",
+    "hembed.com"
   ],
   "streamHosts": "any",
-  "fetchHosts": "any",
   "capabilities": [
     "search",
     "home",
     "browse",
-    "episodes",
-    "resolve",
-    "download"
+    "resolve"
   ],
   "categories": [
     "adult"
   ],
-  "color": "#007575",
+  "color": "#E91E63",
   "icon": "icon.png",
+  "theme": {
+    "accent": "#C2185B",
+    "onAccent": "#FFFFFF",
+    "background": "#0D0D12",
+    "surface": "#1A1A22",
+    "highlight": "#FF5C8A"
+  },
   "settings": [
     {
-      "key": "server",
-      "label": "Servidor preferido",
+      "key": "quality",
+      "label": "Calidad preferida",
       "type": "select",
       "default": "auto",
-      "hint": "Automático prueba primero StreamHLS y Lulu (los más rápidos).",
       "options": [
         {
           "value": "auto",
-          "label": "Automático (más rápidos primero)"
+          "label": "Automática (mejor disponible)"
         },
         {
-          "value": "streamhls",
-          "label": "StreamHLS (más rápido)"
+          "value": "1080",
+          "label": "1080p"
         },
         {
-          "value": "lulu",
-          "label": "Lulu (rápido)"
+          "value": "720",
+          "label": "720p"
         },
         {
-          "value": "byse",
-          "label": "Byse"
-        },
-        {
-          "value": "sendvid",
-          "label": "Sendvid"
-        },
-        {
-          "value": "streamwish",
-          "label": "StreamWish"
-        },
-        {
-          "value": "voe",
-          "label": "VOE"
-        },
-        {
-          "value": "vidhide",
-          "label": "VidHide"
-        },
-        {
-          "value": "gupload",
-          "label": "Gupload (lento)"
-        },
-        {
-          "value": "firestream",
-          "label": "Firestream (lento)"
+          "value": "480",
+          "label": "480p"
         }
       ]
     }
